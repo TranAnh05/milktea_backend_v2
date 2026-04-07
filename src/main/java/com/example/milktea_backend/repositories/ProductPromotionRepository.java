@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductPromotionRepository extends JpaRepository<ProductPromotion, Long> {
@@ -18,4 +19,9 @@ public interface ProductPromotionRepository extends JpaRepository<ProductPromoti
             "WHERE p.isActive = true AND pp.isActive = true " +
             "AND pp.startDate <= :now AND pp.endDate >= :now")
     List<ProductPromotion> findActivePromotions(@Param("now") LocalDateTime now);
+
+    @Query("SELECT pp FROM ProductPromotion pp " +
+            "WHERE pp.product.id = :productId AND pp.isActive = true " +
+            "AND pp.startDate <= :now AND pp.endDate >= :now")
+    Optional<ProductPromotion> findActivePromotionByProductId(@Param("productId") Long productId, @Param("now") LocalDateTime now);
 }
