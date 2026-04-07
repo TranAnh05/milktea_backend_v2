@@ -3,6 +3,9 @@ package com.example.milktea_backend.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "cart_items")
 @Getter
@@ -46,4 +49,8 @@ public class CartItem extends BaseEntity {
     // Chuỗi Hash chống trùng lặp
     @Column(name = "item_signature", nullable = false)
     private String itemSignature;
+
+    @OneToMany(mappedBy = "cartItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default // Thêm cái này để tương thích với @Builder của Lombok
+    private List<CartItemTopping> toppings = new ArrayList<>();
 }
