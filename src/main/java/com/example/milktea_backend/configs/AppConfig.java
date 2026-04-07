@@ -44,10 +44,12 @@ public class AppConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // 4. Cấu hình đường dẫn
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll() // Mở cửa hoàn toàn cho Login/Register
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
-                        .anyRequest().permitAll() // TẠM THỜI mở cửa cho các API khác để dễ code. Sẽ siết lại sau.
+                        .requestMatchers("/api/v1/cart/**").authenticated()
+                        .anyRequest().permitAll()
                 );
 
         // 5. Thêm JwtFilter của chúng ta vào trước Filter mặc định của Spring
