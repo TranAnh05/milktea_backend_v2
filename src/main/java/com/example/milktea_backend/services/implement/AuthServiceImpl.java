@@ -65,6 +65,7 @@ public class AuthServiceImpl implements IAuthService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .phone(user.getPhone())
                 .roles(roles)
                 .build();
 

@@ -16,4 +16,6 @@ public interface ICartService {
     void updateCartItemQuantity(Long userId, String signature, Integer quantity);
 
     void removeCartItem(Long userId, String signature);
+
+    void clearCart(Long userId);
 }

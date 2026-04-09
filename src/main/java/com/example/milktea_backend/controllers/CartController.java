@@ -80,4 +80,16 @@ public class CartController {
                 .message("Đã xóa món khỏi giỏ hàng")
                 .build());
     }
+
+    @DeleteMapping
+    public ResponseEntity<ApiResponse<Void>> clearCart(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        Long userId = userDetails.getUser().getId();
+        cartService.clearCart(userId);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .message("Đã làm sạch giỏ hàng")
+                .build());
+    }
 }
