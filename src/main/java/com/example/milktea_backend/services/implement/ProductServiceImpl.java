@@ -13,7 +13,12 @@ import com.example.milktea_backend.repositories.ProductSizeRepository;
 import com.example.milktea_backend.repositories.ToppingRepository;
 import com.example.milktea_backend.services.interfaces.IProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -128,6 +133,72 @@ public class ProductServiceImpl implements IProductService {
                 .discountPercent(discountPercent)
                 .sizes(sizeDtos)
                 .toppings(toppingDtos)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getProductsByCategorySlug(String slug, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Product> products;
+
+        // Nếu slug rỗng hoặc "all" -> Lấy toàn bộ sản phẩm
+        if (slug == null || slug.trim().isEmpty() || slug.equalsIgnoreCase("all")) {
+            products = productRepository.findByIsActiveTrue(pageable); // (Em nhớ thêm hàm này bên Repository nhé)
+        } else {
+            products = productRepository.findActiveProductsByCategorySlug(slug, pageable);
+        }
+
+        // Tái sử dụng helper mapper
+        return products.map(this::mapToProductResponse);
+    }
+
+    // =================================================================================
+    // 2. CÁC HÀM HỖ TRỢ DÙNG CHUNG (PRIVATE HELPER METHODS)
+    // =================================================================================
+
+    // DTO nội bộ (Inner Class) để hứng kết quả trả về của hàm tính giá
+    private record PriceCalculationResult(int originalPrice, int promoPrice, int discountPercent) {}
+
+    /**
+     * Hàm dùng chung để tính toán Giá Gốc, Giá Khuyến Mãi và % Giảm
+     */
+    private PriceCalculationResult calculateProductPrice(Product product) {
+        int originalPrice = product.getBasePrice();
+        int promoPrice = originalPrice;
+        int discountPercent = 0;
+
+        Optional<ProductPromotion> activePromo = promotionRepository.findActivePromotionByProductId(product.getId(), LocalDateTime.now());
+
+        if (activePromo.isPresent()) {
+            ProductPromotion promo = activePromo.get();
+            if (promo.getDiscountType() == DiscountType.PERCENT) {
+                discountPercent = promo.getDiscountValue();
+                promoPrice = originalPrice - (originalPrice * discountPercent / 100);
+            } else if (promo.getDiscountType() == DiscountType.FIXED_AMOUNT) {
+                int discountAmount = promo.getDiscountValue();
+                promoPrice = Math.max(0, originalPrice - discountAmount);
+                discountPercent = Math.round((float) discountAmount / originalPrice * 100);
+            }
+        }
+        return new PriceCalculationResult(originalPrice, promoPrice, discountPercent);
+    }
+
+    /**
+     * Hàm dùng chung để Map Entity -> ProductResponse (Có kèm giá đã tính toán)
+     */
+    private ProductResponse mapToProductResponse(Product product) {
+        PriceCalculationResult priceResult = calculateProductPrice(product);
+
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .slug(product.getSlug())
+                .thumbnailUrl(product.getThumbnailUrl())
+                .averageRating(product.getAverageRating())
+                .originalPrice(priceResult.originalPrice())
+                .promotionalPrice(priceResult.promoPrice())
+                .discountPercent(priceResult.discountPercent())
                 .build();
     }
 }
