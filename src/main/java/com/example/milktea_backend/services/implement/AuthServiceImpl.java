@@ -14,6 +14,7 @@ import com.example.milktea_backend.services.interfaces.IAuthService;
 import com.example.milktea_backend.services.interfaces.IEmailService;
 import com.example.milktea_backend.utils.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -39,6 +40,9 @@ public class AuthServiceImpl implements IAuthService {
     private final PasswordEncoder passwordEncoder;
     private final IEmailService emailService;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     @Override
     public AuthResponse login(LoginRequest request) {
         // 1. Xác thực tài khoản bằng Spring Security
@@ -51,6 +55,10 @@ public class AuthServiceImpl implements IAuthService {
         // Lấy thông tin user đã được bọc trong CustomUserDetails
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         User user = userDetails.getUser();
+
+        if(!user.getIsVerified()) {
+            throw new IllegalStateException("Tài khoản chưa được xác thực. Vui lòng kiểm tra email của bạn để kích hoạt!");
+        }
 
         // 3. Nhờ JwtUtils tạo chuỗi Token
         String jwt = jwtUtils.generateJwtToken(user.getEmail());
@@ -108,8 +116,10 @@ public class AuthServiceImpl implements IAuthService {
                 .build();
         tokenRepository.save(verificationToken);
 
+        String verifyLink = frontendUrl + "/verify-email?token=" + tokenString;
+
         // 5. Gửi Email (Chạy ngầm)
-        emailService.sendVerificationEmail(newUser.getEmail(), newUser.getFullName(), tokenString);
+        emailService.sendVerificationEmail(newUser.getEmail(), newUser.getFullName(), verifyLink);
     }
 
     @Override

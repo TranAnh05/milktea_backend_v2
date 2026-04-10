@@ -21,9 +21,6 @@ public class AuthController {
 
     private final IAuthService authService;
 
-    @Value("${app.frontend.url}")
-    private String frontendUrl;
-
     @PostMapping("/login")
     // Chú ý: Bắt buộc phải có @Valid để kích hoạt kiểm tra @NotBlank, @Email trong DTO
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
@@ -48,19 +45,12 @@ public class AuthController {
         );
     }
 
-    @GetMapping("/verify")
-    public ResponseEntity<Void> verifyEmail(@RequestParam("token") String token) {
-        try {
-            authService.verifyEmail(token);
-            // Nếu thành công, chuyển hướng về trang Đăng nhập của Client kèm thông báo
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(frontendUrl + "/login?verified=true"))
-                    .build();
-        } catch (Exception e) {
-            // Nếu lỗi/hết hạn, chuyển hướng về trang lỗi
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .location(URI.create(frontendUrl + "/login?error=" + e.getMessage()))
-                    .build();
-        }
+    @PostMapping("/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam("token") String token) {
+        authService.verifyEmail(token);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .message("Xác thực tài khoản thành công")
+                .build());
     }
 }
