@@ -48,6 +48,9 @@ public class AppConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll() // Mở cửa hoàn toàn cho Login/Register
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                        .requestMatchers("/api/v1/vouchers/**").permitAll()
+                        .requestMatchers("/api/v1/orders/track").permitAll()
                         .requestMatchers("/api/v1/cart/**").authenticated()
                         .anyRequest().permitAll()
                 );

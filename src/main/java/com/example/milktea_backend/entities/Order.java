@@ -35,6 +35,9 @@ public class Order extends BaseEntity {
     @Column(name = "guest_address", nullable = false, columnDefinition = "TEXT")
     private String guestAddress;
 
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "sub_total", nullable = false)
     private Integer subTotal;
 

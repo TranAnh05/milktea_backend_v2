@@ -23,6 +23,7 @@ public class AuthResponse {
         private Long id;
         private String email;
         private String fullName;
+        private String phone;
         private List<String> roles;
     }
 }

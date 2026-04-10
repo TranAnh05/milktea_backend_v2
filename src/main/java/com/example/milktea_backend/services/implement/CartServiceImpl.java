@@ -221,4 +221,27 @@ public class CartServiceImpl implements ICartService {
 
         cartItemRepository.delete(item);
     }
+
+    @Override
+    @Transactional
+    public void clearCart(Long userId) {
+        // 1. Tìm giỏ hàng của User. Nếu không có thì không cần làm gì cả.
+        Optional<Cart> optionalCart = cartRepository.findByUserId(userId);
+
+        if (optionalCart.isPresent()) {
+            Cart cart = optionalCart.get();
+
+            // 2. Lấy toàn bộ danh sách món ăn trong giỏ
+            List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
+
+            // 3. Xóa sạch sẽ. (Nhờ CascadeType.ALL, bảng Topping sẽ tự động bị xóa theo)
+            if (!items.isEmpty()) {
+                cartItemRepository.deleteAll(items);
+            }
+
+            // LƯU Ý: Tuyệt đối KHÔNG xóa cái "Cart" gốc (cartRepository.delete(cart)),
+            // vì cái Cart này giống như cái rổ nhựa. Khách mua xong mình chỉ đổ đồ ra,
+            // giữ lại cái rổ rỗng để lần sau khách mua tiếp!
+        }
+    }
 }
