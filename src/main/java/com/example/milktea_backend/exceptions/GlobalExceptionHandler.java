@@ -77,8 +77,8 @@ public class GlobalExceptionHandler {
     }
 
     // 5. Bắt các lỗi Logic nghiệp vụ (Ví dụ: Trùng email, Token hết hạn, Dữ liệu không hợp lệ)
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(RuntimeException ex, HttpServletRequest request) {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .status(HttpStatus.BAD_REQUEST.value())
                 .message(ex.getMessage()) // Lấy chính câu message mà chúng ta throw ra trong Service

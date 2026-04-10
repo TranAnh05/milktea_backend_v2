@@ -22,7 +22,7 @@ public class EmailServiceImpl implements IEmailService {
     // Annotation @Async giúp việc gửi email chạy ngầm, không làm Frontend phải chờ lâu
     @Async
     @Override
-    public void sendVerificationEmail(String toEmail, String fullName, String token) {
+    public void sendVerificationEmail(String toEmail, String fullName, String verifyLink) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -33,12 +33,12 @@ public class EmailServiceImpl implements IEmailService {
 
             // Build nội dung Email bằng HTML cho đẹp mắt
             // Lưu ý: Đường dẫn này sẽ trỏ về Controller của Backend để xử lý logic trước
-            String verificationLink = "http://localhost:8080/api/v1/auth/verify?token=" + token;
+
 
             String htmlContent = "<div style='font-family: Arial, sans-serif; padding: 20px;'>"
                     + "<h2>Chào " + fullName + ",</h2>"
                     + "<p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng click vào nút bên dưới để xác thực email của bạn (Link có hiệu lực trong 15 phút):</p>"
-                    + "<a href='" + verificationLink + "' style='display: inline-block; padding: 10px 20px; color: white; background-color: #28a745; text-decoration: none; border-radius: 5px;'>Xác thực ngay</a>"
+                    + "<a href='" + verifyLink + "' style='display: inline-block; padding: 10px 20px; color: white; background-color: #28a745; text-decoration: none; border-radius: 5px;'>Xác thực ngay</a>"
                     + "<p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>"
                     + "</div>";
 
