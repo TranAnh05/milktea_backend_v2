@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity   // ← BẬT @PreAuthorize trên các Admin Controller
 public class AppConfig {
 
     @Bean
@@ -34,45 +36,56 @@ public class AppConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                // 1. Kích hoạt CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 2. Tắt CSRF (Bắt buộc với REST API)
-                .csrf(AbstractHttpConfigurer::disable)
-                // 3. Không sử dụng Session lưu trạng thái (Stateless)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 4. Cấu hình đường dẫn
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll() // Mở cửa hoàn toàn cho Login/Register
-                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
-                        .requestMatchers("/api/v1/vouchers/**").permitAll()
-                        .requestMatchers("/api/v1/orders/track").permitAll()
-                        .requestMatchers("/api/v1/cart/**").authenticated()
-                        .anyRequest().permitAll()
-                );
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // OPTIONS preflight
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-        // 5. Thêm JwtFilter của chúng ta vào trước Filter mặc định của Spring
+                // =====================================================
+                //  CLIENT ROUTES — GIỮ NGUYÊN HOÀN TOÀN
+                // =====================================================
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                .requestMatchers("/api/v1/vouchers/**").permitAll()
+                .requestMatchers("/api/v1/orders/track").permitAll()
+                .requestMatchers("/api/v1/cart/**").authenticated()
+
+                // =====================================================
+                //  ADMIN ROUTES — Yêu cầu đăng nhập,
+                //  phân quyền chi tiết xử lý bởi @PreAuthorize
+                // =====================================================
+                .requestMatchers("/api/v1/admin/**").authenticated()
+
+                // Tất cả route khác: yêu cầu đăng nhập
+                // (Đổi từ permitAll() → authenticated() để bảo mật hơn)
+                .anyRequest().authenticated()
+            );
+
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
-    // Cấu hình CORS: Cho phép 2 cổng React của Client và Admin gọi vào Backend
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Cấu hình cổng của Frontend Client (Ví dụ 3000) và Admin (Ví dụ 3001)
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:3001"));
+        // Port 3000: Client | Port 3001: Admin
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000",
+                "http://localhost:3001"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration); // Áp dụng CORS cho tất cả API
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 }
