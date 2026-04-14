@@ -4,6 +4,7 @@ import com.example.milktea_backend.dtos.requests.OrderRequest;
 import com.example.milktea_backend.dtos.responses.ApiResponse;
 import com.example.milktea_backend.dtos.responses.OrderDetailResponse;
 import com.example.milktea_backend.dtos.responses.OrderHistoryResponse;
+import com.example.milktea_backend.dtos.responses.PlaceOrderResponse;
 import com.example.milktea_backend.entities.Order;
 import com.example.milktea_backend.enums.OrderStatus;
 import com.example.milktea_backend.security.CustomUserDetails;
@@ -16,6 +17,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -25,7 +29,7 @@ public class OrderController {
 
     // API: Đặt hàng (Dùng chung cho cả User và Guest)
     @PostMapping
-    public ResponseEntity<ApiResponse<String>> placeOrder(
+    public ResponseEntity<ApiResponse<PlaceOrderResponse>> placeOrder(
             @Valid @RequestBody OrderRequest request, // Thêm @Valid để kích hoạt kiểm tra dữ liệu
             @AuthenticationPrincipal CustomUserDetails userDetails) { // Chấp nhận null nếu không có Token
 
@@ -33,11 +37,11 @@ public class OrderController {
         Long userId = (userDetails != null) ? userDetails.getUser().getId() : null;
 
         // Chuyền xuống Service xử lý và nhận lại mã đơn hàng
-        String orderId = orderService.placeOrder(userId, request);
+        PlaceOrderResponse response = orderService.placeOrder(userId, request);
 
-        return ResponseEntity.ok(ApiResponse.<String>builder()
+        return ResponseEntity.ok(ApiResponse.<PlaceOrderResponse>builder()
                 .message("Đặt hàng thành công")
-                .data(orderId) // Trả mã đơn hàng (Vd: ORD-1698765432) về cho Frontend
+                .data(response) // Trả mã đơn hàng (Vd: ORD-1698765432) về cho Frontend
                 .build());
     }
 
@@ -98,6 +102,16 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.<OrderDetailResponse>builder()
                 .message("Tra cứu đơn hàng thành công")
                 .data(orderService.trackGuestOrder(orderId, phone))
+                .build());
+    }
+
+    @GetMapping("/{orderId}/payment-status")
+    public ResponseEntity<ApiResponse<String>> checkPaymentStatus(@PathVariable String orderId) {
+        String status = orderService.checkPaymentStatus(orderId);
+
+        return ResponseEntity.ok(ApiResponse.<String>builder()
+                .message("Lấy trạng thái thanh toán thành công")
+                .data(status)
                 .build());
     }
 }

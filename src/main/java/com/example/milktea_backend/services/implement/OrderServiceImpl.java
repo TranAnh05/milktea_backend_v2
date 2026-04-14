@@ -4,6 +4,7 @@ import com.example.milktea_backend.dtos.requests.CartItemRequest;
 import com.example.milktea_backend.dtos.requests.OrderRequest;
 import com.example.milktea_backend.dtos.responses.OrderDetailResponse;
 import com.example.milktea_backend.dtos.responses.OrderHistoryResponse;
+import com.example.milktea_backend.dtos.responses.PlaceOrderResponse;
 import com.example.milktea_backend.entities.*;
 import com.example.milktea_backend.enums.DiscountType;
 import com.example.milktea_backend.enums.OrderStatus;
@@ -43,7 +44,7 @@ public class OrderServiceImpl implements IOrderService {
 
     @Override
     @Transactional
-    public String placeOrder(Long userId, OrderRequest request) {
+    public PlaceOrderResponse placeOrder(Long userId, OrderRequest request) {
         // 1. KHỞI TẠO ĐƠN HÀNG MỚI
         Order order = new Order();
         // Tạo mã đơn hàng độc nhất: ORD- + Timestamp (Hoặc 8 ký tự random)
@@ -148,7 +149,7 @@ public class OrderServiceImpl implements IOrderService {
         }
 
         // 3. TÍNH TOÁN TỔNG TIỀN CUỐI CÙNG & VOUCHER
-        int shippingFee = 15000;
+        int shippingFee = 0;
         int discountAmount = 0;
 
         if (request.getVoucherId() != null) {
@@ -216,7 +217,11 @@ public class OrderServiceImpl implements IOrderService {
         }
 
         // Trả về mã đơn hàng cho Frontend (để Frontend chuyển sang trang Thank You)
-        return orderId;
+        return PlaceOrderResponse.builder()
+                .orderId(orderId)
+                .finalTotal(finalTotal)
+                .paymentMethod(request.getPaymentMethod())
+                .build();
     }
 
     private int calculateSecureUnitPrice(CartItemRequest request) {
@@ -379,5 +384,13 @@ public class OrderServiceImpl implements IOrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .items(itemDtos)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String checkPaymentStatus(String orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        return order.getPaymentStatus().name(); // Trả về "UNPAID" hoặc "PAID"
     }
 }
