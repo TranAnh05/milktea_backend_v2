@@ -87,7 +87,7 @@ public class AuthServiceImpl implements IAuthService {
     @Override
     public void register(RegisterRequest request) {
         // 1. Kiểm tra email trùng lặp
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email này đã được đăng ký trong hệ thống!");
         }
 
