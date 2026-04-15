@@ -7,6 +7,7 @@ import com.example.milktea_backend.exceptions.ResourceNotFoundException;
 import com.example.milktea_backend.repositories.CategoryRepository;
 import com.example.milktea_backend.services.interfaces.IAdminCategoryService;
 import com.example.milktea_backend.services.interfaces.IAdminProductService;
+import com.example.milktea_backend.services.interfaces.IMediaStorageService;
 import com.example.milktea_backend.utils.ExcelCsvHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class AdminCategoryServiceImpl implements IAdminCategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ExcelCsvHelper excelCsvHelper;
+    private final IMediaStorageService mediaStorageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,7 +49,7 @@ public class AdminCategoryServiceImpl implements IAdminCategoryService {
                 .name(request.getName())
                 .slug(generateSlug(request.getName()))
                 .description(request.getDescription())
-                .imageUrl(request.getImageUrl())
+            .imageUrl(mediaStorageService.persistExternalImage(request.getImageUrl(), "category"))
                 .isActive(request.getIsActive())
                 .build();
         return mapToResponse(categoryRepository.save(cat));
@@ -62,7 +64,7 @@ public class AdminCategoryServiceImpl implements IAdminCategoryService {
         }
         cat.setName(request.getName());
         cat.setDescription(request.getDescription());
-        cat.setImageUrl(request.getImageUrl());
+        cat.setImageUrl(mediaStorageService.persistExternalImage(request.getImageUrl(), "category"));
         cat.setIsActive(request.getIsActive());
         return mapToResponse(categoryRepository.save(cat));
     }
@@ -102,9 +104,13 @@ public class AdminCategoryServiceImpl implements IAdminCategoryService {
     public IAdminProductService.ImportResult importCategories(MultipartFile file) {
         List<Map<String, String>> rawRows;
         try {
-            rawRows = excelCsvHelper.isExcelFile(file)
-                    ? excelCsvHelper.readExcel(file)
-                    : excelCsvHelper.readCsv(file);
+            if (excelCsvHelper.isExcelFile(file)) {
+                rawRows = excelCsvHelper.readExcel(file);
+            } else if (excelCsvHelper.isCsvFile(file)) {
+                rawRows = excelCsvHelper.readCsv(file);
+            } else {
+                throw new IllegalArgumentException("Chỉ hỗ trợ file .xlsx, .xls, .csv");
+            }
         } catch (IOException e) {
             throw new RuntimeException("Lỗi đọc file", e);
         }
@@ -124,14 +130,14 @@ public class AdminCategoryServiceImpl implements IAdminCategoryService {
                     // Cập nhật nếu đã tồn tại
                     Category cat = existing.get();
                     cat.setDescription(row.getOrDefault("Mô tả", cat.getDescription()));
-                    cat.setImageUrl(row.getOrDefault("Ảnh", cat.getImageUrl()));
+                    cat.setImageUrl(mediaStorageService.persistExternalImage(row.getOrDefault("Ảnh", cat.getImageUrl()), "category"));
                     categoryRepository.save(cat);
                 } else {
                     categoryRepository.save(Category.builder()
                             .name(name)
                             .slug(generateSlug(name))
                             .description(row.getOrDefault("Mô tả", ""))
-                            .imageUrl(row.getOrDefault("Ảnh", ""))
+                            .imageUrl(mediaStorageService.persistExternalImage(row.getOrDefault("Ảnh", ""), "category"))
                             .isActive(true)
                             .build());
                 }

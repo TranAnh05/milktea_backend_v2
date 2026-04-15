@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 // ============================================================
@@ -48,4 +50,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // Đếm tổng sản phẩm đang hoạt động
     Long countByIsActiveTrue();
+
+    List<Product> findByIsActiveTrue();
+
+    List<Product> findByCategoryIdInAndIsActiveTrue(Collection<Long> categoryIds);
+
+    List<Product> findByIdInAndIsActiveTrue(Collection<Long> ids);
 }

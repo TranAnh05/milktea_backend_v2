@@ -45,6 +45,19 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     // Đếm đơn hàng theo trạng thái
     Long countByOrderStatus(OrderStatus status);
 
+    @Query("SELECT COUNT(o) FROM Order o WHERE " +
+           "(:from IS NULL OR o.createdAt >= :from) AND " +
+           "(:to IS NULL OR o.createdAt <= :to)")
+    Long countByDateRange(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE " +
+           "o.orderStatus = :status AND " +
+           "(:from IS NULL OR o.createdAt >= :from) AND " +
+           "(:to IS NULL OR o.createdAt <= :to)")
+    Long countByOrderStatusAndDateRange(@Param("status") OrderStatus status,
+                                        @Param("from") LocalDateTime from,
+                                        @Param("to") LocalDateTime to);
+
     // Đếm đơn hàng trong khoảng thời gian
     Long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
@@ -63,6 +76,13 @@ public interface OrderRepository extends JpaRepository<Order, String> {
                    "GROUP BY YEAR(created_at), MONTH(created_at) ORDER BY YEAR(created_at), MONTH(created_at)",
            nativeQuery = true)
     List<Object[]> revenueByMonth(@Param("year") int year);
+
+    @Query(value = "SELECT DATE_FORMAT(MIN(created_at), '%m/%Y') as label, COUNT(*) as orderCount, SUM(final_total) as revenue " +
+                   "FROM orders WHERE order_status = 'COMPLETED' " +
+                   "AND created_at BETWEEN :from AND :to " +
+                   "GROUP BY YEAR(created_at), MONTH(created_at) ORDER BY YEAR(created_at), MONTH(created_at)",
+           nativeQuery = true)
+    List<Object[]> revenueByMonthInRange(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     // Doanh thu theo quý
     @Query(value = "SELECT CONCAT('Q', QUARTER(created_at), '/', YEAR(created_at)) as label, " +

@@ -7,6 +7,7 @@ import com.example.milktea_backend.entities.*;
 import com.example.milktea_backend.exceptions.ResourceNotFoundException;
 import com.example.milktea_backend.repositories.*;
 import com.example.milktea_backend.services.interfaces.IAdminProductService;
+import com.example.milktea_backend.services.interfaces.IMediaStorageService;
 import com.example.milktea_backend.utils.ExcelCsvHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -28,6 +29,7 @@ public class AdminProductServiceImpl implements IAdminProductService {
     private final ProductSizeRepository productSizeRepository;
     private final SizeRepository sizeRepository;
     private final ExcelCsvHelper excelCsvHelper;
+    private final IMediaStorageService mediaStorageService;
 
     // =====================================================================
     //  READ
@@ -75,7 +77,7 @@ public class AdminProductServiceImpl implements IAdminProductService {
                 .slug(slug)
                 .description(request.getDescription())
                 .basePrice(request.getBasePrice())
-                .thumbnailUrl(request.getThumbnailUrl())
+            .thumbnailUrl(mediaStorageService.persistExternalImage(request.getThumbnailUrl(), "product"))
                 .isActive(request.getIsActive())
                 .build();
 
@@ -116,7 +118,7 @@ public class AdminProductServiceImpl implements IAdminProductService {
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setBasePrice(request.getBasePrice());
-        product.setThumbnailUrl(request.getThumbnailUrl());
+        product.setThumbnailUrl(mediaStorageService.persistExternalImage(request.getThumbnailUrl(), "product"));
         product.setIsActive(request.getIsActive());
         product = productRepository.save(product);
 
@@ -233,7 +235,7 @@ public class AdminProductServiceImpl implements IAdminProductService {
                     product.setBasePrice(basePrice);
                     product.setCategory(category);
                     product.setDescription(row.getOrDefault("Mô tả", ""));
-                    product.setThumbnailUrl(row.getOrDefault("Ảnh thumbnail", ""));
+                    product.setThumbnailUrl(mediaStorageService.persistExternalImage(row.getOrDefault("Ảnh thumbnail", ""), "product"));
                 } else {
                     product = Product.builder()
                             .sku(normalizedSku)
@@ -242,7 +244,7 @@ public class AdminProductServiceImpl implements IAdminProductService {
                             .basePrice(basePrice)
                             .category(category)
                             .description(row.getOrDefault("Mô tả", ""))
-                            .thumbnailUrl(row.getOrDefault("Ảnh thumbnail", ""))
+                            .thumbnailUrl(mediaStorageService.persistExternalImage(row.getOrDefault("Ảnh thumbnail", ""), "product"))
                             .isActive(true)
                             .build();
                 }

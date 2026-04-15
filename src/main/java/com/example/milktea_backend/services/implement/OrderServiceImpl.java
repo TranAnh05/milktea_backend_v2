@@ -153,7 +153,7 @@ public class OrderServiceImpl implements IOrderService {
         int discountAmount = 0;
 
         if (request.getVoucherId() != null) {
-            Voucher voucher = voucherRepository.findById(request.getVoucherId())
+            Voucher voucher = voucherRepository.findByIdForUpdate(request.getVoucherId())
                     .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không tồn tại"));
 
             // --- KIỂM TRA LẠI 4 LỚP BẢO MẬT TRƯỚC KHI TẠO ĐƠN ---
@@ -180,6 +180,7 @@ public class OrderServiceImpl implements IOrderService {
                     discountAmount = voucher.getMaxDiscountAmount(); // Cắt trần
                 }
             }
+            discountAmount = Math.min(discountAmount, subTotal);
             order.setVoucher(voucher);
 
             // Trừ tồn kho và Lưu lịch sử Usage
