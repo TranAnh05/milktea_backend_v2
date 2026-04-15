@@ -49,10 +49,15 @@ public class AppConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders").permitAll()
                         .requestMatchers("/api/v1/vouchers/**").permitAll()
                         .requestMatchers("/api/v1/orders/track").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
                         .requestMatchers("/api/v1/cart/**").authenticated()
-                        .anyRequest().permitAll()
+
+                        // ADMIN
+                        .requestMatchers("/api/v1/admin/**").authenticated()
+                        .anyRequest().authenticated()
                 );
 
         // 5. Thêm JwtFilter của chúng ta vào trước Filter mặc định của Spring

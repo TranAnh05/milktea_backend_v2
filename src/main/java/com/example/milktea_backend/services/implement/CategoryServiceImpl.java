@@ -22,6 +22,8 @@ public class CategoryServiceImpl implements ICategoryService {
                         .id(category.getId())
                         .name(category.getName())
                         .slug(category.getSlug())
+                        .description(category.getDescription())
+                        .imageUrl(category.getImageUrl())
                         .build())
                 .collect(Collectors.toList());
     }

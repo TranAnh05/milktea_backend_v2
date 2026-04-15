@@ -41,7 +41,7 @@ public class OrderController {
 
         return ResponseEntity.ok(ApiResponse.<PlaceOrderResponse>builder()
                 .message("Đặt hàng thành công")
-                .data(response) // Trả mã đơn hàng (Vd: ORD-1698765432) về cho Frontend
+                .data(response)
                 .build());
     }
 
