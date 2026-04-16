@@ -51,6 +51,7 @@ public class AppConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/orders").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/orders").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders/*/payment-status").permitAll()
                         .requestMatchers("/api/v1/vouchers/**").permitAll()
                         .requestMatchers("/api/v1/orders/track").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()

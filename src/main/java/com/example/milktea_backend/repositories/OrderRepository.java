@@ -2,6 +2,8 @@ package com.example.milktea_backend.repositories;
 
 import com.example.milktea_backend.entities.Order;
 import com.example.milktea_backend.enums.OrderStatus;
+import com.example.milktea_backend.enums.PaymentMethod;
+import com.example.milktea_backend.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,6 +23,15 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     Page<Order> findByUserIdAndOrderStatus(Long userId, OrderStatus orderStatus, Pageable pageable);
     Optional<Order> findByIdAndUserId(String id, Long userId);
     Optional<Order> findByIdAndGuestPhone(String id, String guestPhone);
+
+    @Query("SELECT o FROM Order o WHERE o.paymentStatus = :paymentStatus " +
+            "AND o.paymentMethod = :paymentMethod " +
+            "AND o.createdAt < :expireTime")
+    List<Order> findExpiredOrders(
+            @Param("paymentStatus") PaymentStatus paymentStatus,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("expireTime") LocalDateTime expireTime
+    );
 
     // ADMIN
     @Query("SELECT o FROM Order o WHERE " +
