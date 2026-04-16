@@ -40,9 +40,13 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
     @Override
     @Transactional
     public VoucherResponse createVoucher(AdminVoucherRequest request) {
-        if (voucherRepository.existsByCode(request.getCode())) {
-            throw new IllegalArgumentException("Mã voucher '" + request.getCode() + "' đã tồn tại");
+        String normalizedCode = normalizeVoucherCode(request.getCode());
+        validateVoucherPayload(request);
+
+        if (voucherRepository.existsByCodeIgnoreCase(normalizedCode)) {
+            throw new IllegalArgumentException("Mã voucher '" + normalizedCode + "' đã tồn tại");
         }
+
         Voucher voucher = buildVoucherFromRequest(new Voucher(), request);
         return mapToResponse(voucherRepository.save(voucher));
     }
@@ -51,10 +55,15 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
     @Transactional
     public VoucherResponse updateVoucher(Long id, AdminVoucherRequest request) {
         Voucher voucher = findOrThrow(id);
+        String normalizedCode = normalizeVoucherCode(request.getCode());
+        validateVoucherPayload(request);
+
         // Kiểm tra trùng code (trừ chính nó)
-        if (!voucher.getCode().equals(request.getCode()) && voucherRepository.existsByCode(request.getCode())) {
-            throw new IllegalArgumentException("Mã voucher '" + request.getCode() + "' đã được sử dụng");
+        if (!voucher.getCode().equalsIgnoreCase(normalizedCode)
+                && voucherRepository.existsByCodeIgnoreCase(normalizedCode)) {
+            throw new IllegalArgumentException("Mã voucher '" + normalizedCode + "' đã được sử dụng");
         }
+
         return mapToResponse(voucherRepository.save(buildVoucherFromRequest(voucher, request)));
     }
 
@@ -104,9 +113,13 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
     public IAdminProductService.ImportResult importVouchers(MultipartFile file) {
         List<Map<String, String>> rawRows;
         try {
-            rawRows = excelCsvHelper.isExcelFile(file)
-                    ? excelCsvHelper.readExcel(file)
-                    : excelCsvHelper.readCsv(file);
+            if (excelCsvHelper.isExcelFile(file)) {
+                rawRows = excelCsvHelper.readExcel(file);
+            } else if (excelCsvHelper.isCsvFile(file)) {
+                rawRows = excelCsvHelper.readCsv(file);
+            } else {
+                throw new IllegalArgumentException("Chỉ hỗ trợ file .xlsx, .xls, .csv");
+            }
         } catch (IOException e) {
             throw new RuntimeException("Lỗi đọc file", e);
         }
@@ -118,25 +131,38 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
             int rowNum = i + 2;
             Map<String, String> row = rawRows.get(i);
             try {
-                String code = row.getOrDefault("Mã voucher", "").trim();
+                String code = normalizeVoucherCode(row.getOrDefault("Mã voucher", ""));
                 if (code.isBlank()) throw new IllegalArgumentException("Thiếu mã voucher");
 
                 DiscountType dtype = DiscountType.valueOf(
                         row.getOrDefault("Loại giảm", "PERCENT").trim().toUpperCase());
                 int discountValue = Integer.parseInt(row.getOrDefault("Giá trị giảm", "0").trim());
+                int minOrderAmount = parseIntOrDefault(row.getOrDefault("Đơn tối thiểu", "0"), 0);
+                Integer maxDiscountAmount = parseNullableInteger(row.getOrDefault("Giảm tối đa", ""));
                 int quantity      = Integer.parseInt(row.getOrDefault("Số lượng", "0").trim());
                 LocalDateTime start = LocalDateTime.parse(row.getOrDefault("Bắt đầu", "").trim(), DT_FMT);
                 LocalDateTime end   = LocalDateTime.parse(row.getOrDefault("Kết thúc", "").trim(), DT_FMT);
+                Boolean isActive = parseStatus(row.getOrDefault("Trạng thái", "Đang hoạt động"));
 
-                Optional<Voucher> existing = voucherRepository.findByCode(code);
+                if (discountValue <= 0) throw new IllegalArgumentException("Giá trị giảm phải > 0");
+                if (quantity <= 0) throw new IllegalArgumentException("Số lượng phải > 0");
+                if (!start.isBefore(end)) throw new IllegalArgumentException("Ngày bắt đầu phải trước ngày kết thúc");
+                if (minOrderAmount < 0) throw new IllegalArgumentException("Đơn tối thiểu không được âm");
+                if (maxDiscountAmount != null && maxDiscountAmount <= 0) {
+                    throw new IllegalArgumentException("Giảm tối đa phải > 0");
+                }
+
+                Optional<Voucher> existing = voucherRepository.findByCodeIgnoreCase(code);
                 Voucher voucher = existing.orElseGet(Voucher::new);
                 voucher.setCode(code);
                 voucher.setDiscountType(dtype);
                 voucher.setDiscountValue(discountValue);
+                voucher.setMinOrderAmount(minOrderAmount);
+                voucher.setMaxDiscountAmount(maxDiscountAmount);
                 voucher.setQuantity(quantity);
                 voucher.setStartDate(start);
                 voucher.setEndDate(end);
-                voucher.setIsActive(true);
+                voucher.setIsActive(isActive);
                 voucherRepository.save(voucher);
                 success++;
             } catch (Exception e) {
@@ -147,17 +173,65 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
         return new IAdminProductService.ImportResult(success, failed, errors);
     }
 
+    private int parseIntOrDefault(String raw, int defaultValue) {
+        if (raw == null || raw.isBlank()) return defaultValue;
+        return Integer.parseInt(raw.trim());
+    }
+
+    private Integer parseNullableInteger(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return Integer.parseInt(raw.trim());
+    }
+
+    private Boolean parseStatus(String raw) {
+        if (raw == null) return true;
+        String normalized = raw.trim().toLowerCase();
+        return !(normalized.equals("đã tắt") || normalized.equals("tat") || normalized.equals("off") || normalized.equals("false"));
+    }
+
     private Voucher buildVoucherFromRequest(Voucher voucher, AdminVoucherRequest req) {
-        voucher.setCode(req.getCode().toUpperCase());
-        voucher.setDiscountType(DiscountType.valueOf(req.getDiscountType()));
+        voucher.setCode(normalizeVoucherCode(req.getCode()));
+        voucher.setDiscountType(DiscountType.valueOf(req.getDiscountType().trim().toUpperCase()));
         voucher.setDiscountValue(req.getDiscountValue());
         voucher.setMinOrderAmount(req.getMinOrderAmount() != null ? req.getMinOrderAmount() : 0);
         voucher.setMaxDiscountAmount(req.getMaxDiscountAmount());
         voucher.setQuantity(req.getQuantity());
         voucher.setStartDate(req.getStartDate());
         voucher.setEndDate(req.getEndDate());
-        voucher.setIsActive(req.getIsActive());
+        voucher.setIsActive(req.getIsActive() != null ? req.getIsActive() : Boolean.TRUE);
         return voucher;
+    }
+
+    private String normalizeVoucherCode(String code) {
+        if (code == null) {
+            return "";
+        }
+        return code.trim().toUpperCase();
+    }
+
+    private void validateVoucherPayload(AdminVoucherRequest req) {
+        if (req.getStartDate() != null && req.getEndDate() != null && !req.getStartDate().isBefore(req.getEndDate())) {
+            throw new IllegalArgumentException("Ngày bắt đầu phải trước ngày kết thúc");
+        }
+
+        if (req.getMinOrderAmount() != null && req.getMinOrderAmount() < 0) {
+            throw new IllegalArgumentException("Đơn tối thiểu không được âm");
+        }
+
+        if (req.getMaxDiscountAmount() != null && req.getMaxDiscountAmount() <= 0) {
+            throw new IllegalArgumentException("Giảm tối đa phải > 0");
+        }
+
+        DiscountType discountType;
+        try {
+            discountType = DiscountType.valueOf(req.getDiscountType().trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Loại giảm không hợp lệ. Chỉ chấp nhận PERCENT hoặc FIXED_AMOUNT");
+        }
+
+        if (discountType == DiscountType.PERCENT && req.getDiscountValue() != null && req.getDiscountValue() > 100) {
+            throw new IllegalArgumentException("Giảm theo phần trăm không được vượt quá 100");
+        }
     }
 
     private Voucher findOrThrow(Long id) {
@@ -173,9 +247,13 @@ public class AdminVoucherServiceImpl implements IAdminVoucherService {
         return VoucherResponse.builder()
                 .id(v.getId())
                 .code(v.getCode())
+                .discountType(v.getDiscountType().name())
+                .discountValue(v.getDiscountValue())
                 .discountAmount(v.getDiscountValue())
                 .message(message)
                 .minOrderAmount(v.getMinOrderAmount())
+                .startDate(v.getStartDate())
+                .endDate(v.getEndDate())
                 .build();
     }
 }

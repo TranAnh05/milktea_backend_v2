@@ -54,6 +54,21 @@ public class AdminOrderController {
                 .data(adminOrderService.getOrderDetail(orderId)).build());
     }
 
+        // ---------------------------------------------------------------
+        // EXPORT SINGLE INVOICE PDF
+        // ---------------------------------------------------------------
+        @GetMapping("/{orderId}/invoice")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MANAGER','ROLE_STAFF','ROLE_ACCOUNTANT')")
+        public ResponseEntity<byte[]> exportOrderInvoice(@PathVariable String orderId) {
+                byte[] data = adminOrderService.exportOrderInvoicePdf(orderId);
+                String filename = "hoa-don-" + orderId + ".pdf";
+
+                return ResponseEntity.ok()
+                                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                                .contentType(MediaType.APPLICATION_PDF)
+                                .body(data);
+        }
+
     // ---------------------------------------------------------------
     // UPDATE STATUS — ADMIN, MANAGER, STAFF
     // ---------------------------------------------------------------
@@ -73,7 +88,7 @@ public class AdminOrderController {
     // ---------------------------------------------------------------
     /**
      * GET /api/v1/admin/orders/export?format=excel&from=...&to=...&status=COMPLETED
-     * format: "excel" (default) | "csv"
+        * format: "excel" (default) | "csv" | "pdf"
      */
     @GetMapping("/export")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MANAGER','ROLE_ACCOUNTANT')")
@@ -85,9 +100,12 @@ public class AdminOrderController {
 
         byte[] data = adminOrderService.exportOrders(from, to, status, format);
 
-        String filename = "don-hang." + ("csv".equalsIgnoreCase(format) ? "csv" : "xlsx");
+        String extension = "excel".equalsIgnoreCase(format) ? "xlsx" : format.toLowerCase();
+        String filename = "don-hang." + extension;
         String contentType = "csv".equalsIgnoreCase(format)
                 ? "text/csv; charset=UTF-8"
+                : "pdf".equalsIgnoreCase(format)
+                ? "application/pdf"
                 : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
         return ResponseEntity.ok()

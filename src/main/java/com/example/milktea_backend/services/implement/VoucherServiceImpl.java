@@ -19,11 +19,18 @@ public class VoucherServiceImpl implements IVoucherService {
 
     @Override
     public VoucherResponse checkVoucher(String code, Integer orderValue) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Mã giảm giá không được để trống.");
+        }
+        if (orderValue == null || orderValue <= 0) {
+            throw new IllegalArgumentException("Giá trị đơn hàng không hợp lệ.");
+        }
+
         // Chuẩn hóa code: Cắt khoảng trắng và viết hoa toàn bộ
         String cleanCode = code.trim().toUpperCase();
 
         // Lớp 1: Tồn tại không?
-        Voucher voucher = voucherRepository.findByCode(cleanCode)
+        Voucher voucher = voucherRepository.findByCodeIgnoreCase(cleanCode)
                 .orElseThrow(() -> new IllegalArgumentException("Mã giảm giá không tồn tại."));
 
         // Lớp 2: Trạng thái kích hoạt?
@@ -68,8 +75,13 @@ public class VoucherServiceImpl implements IVoucherService {
         return VoucherResponse.builder()
                 .id(voucher.getId())
                 .code(voucher.getCode())
+                .discountType(voucher.getDiscountType().name())
+                .discountValue(voucher.getDiscountValue())
                 .discountAmount(discountAmount)
                 .message("Áp dụng mã thành công! Bạn được giảm " + String.format("%,d", discountAmount) + "đ")
+                .minOrderAmount(voucher.getMinOrderAmount())
+                .startDate(voucher.getStartDate())
+                .endDate(voucher.getEndDate())
                 .build();
     }
 
@@ -86,9 +98,13 @@ public class VoucherServiceImpl implements IVoucherService {
             return VoucherResponse.builder()
                     .id(v.getId())
                     .code(v.getCode())
+                    .discountType(v.getDiscountType().name())
+                    .discountValue(v.getDiscountValue())
                     .discountAmount(0) // Giá trị này chỉ dùng khi check 1 đơn cụ thể
                     .message(description)
                     .minOrderAmount(v.getMinOrderAmount())
+                    .startDate(v.getStartDate())
+                    .endDate(v.getEndDate())
                     .build();
         }).toList();
     }

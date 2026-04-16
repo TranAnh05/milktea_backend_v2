@@ -5,7 +5,6 @@ import com.example.milktea_backend.dtos.responses.AdminOrderResponse;
 import com.example.milktea_backend.dtos.responses.OrderDetailResponse;
 import com.example.milktea_backend.enums.OrderStatus;
 import org.springframework.data.domain.Page;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,4 +28,7 @@ public interface IAdminOrderService {
 
     // Lấy danh sách đơn để export (dùng nội bộ)
     List<AdminOrderResponse> getOrdersForExport(LocalDateTime from, LocalDateTime to, OrderStatus status);
+
+    // In hóa đơn PDF cho 1 đơn hàng
+    byte[] exportOrderInvoicePdf(String orderId);
 }

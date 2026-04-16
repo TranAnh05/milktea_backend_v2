@@ -26,25 +26,26 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
 
     @Override
     @Transactional(readOnly = true)
-    public AdminDashboardResponse getDashboard(String period, Integer year, String fromDay, String toDay) {
+    public AdminDashboardResponse getDashboard(String period, Integer year, Integer month, Integer quarter,
+                                               String date, String fromDay, String toDay) {
 
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
+        TimeRange range = resolveRange(period, year, month, quarter, date, fromDay, toDay);
 
         // 1. Tổng quan thẻ KPI
-        long totalOrders    = orderRepository.count();
-        long completed      = orderRepository.countByOrderStatus(OrderStatus.COMPLETED);
-        long pending        = orderRepository.countByOrderStatus(OrderStatus.PENDING);
-        long cancelled      = orderRepository.countByOrderStatus(OrderStatus.CANCELLED);
+        long totalOrders    = orderRepository.countByDateRange(range.from(), range.to());
+        long completed      = orderRepository.countByOrderStatusAndDateRange(OrderStatus.COMPLETED, range.from(), range.to());
+        long pending        = orderRepository.countByOrderStatusAndDateRange(OrderStatus.PENDING, range.from(), range.to());
+        long cancelled      = orderRepository.countByOrderStatusAndDateRange(OrderStatus.CANCELLED, range.from(), range.to());
         long totalCustomers = userRepository.countByRoleCode("ROLE_CUSTOMER");
-        long totalRevenue   = orderRepository.sumRevenueByDateRange(null, null);
+        long totalRevenue   = orderRepository.sumRevenueByDateRange(range.from(), range.to());
 
         // 2. Biểu đồ doanh thu theo period
-        List<AdminDashboardResponse.RevenuePoint> chart = buildRevenueChart(period, targetYear, fromDay, toDay);
+        List<AdminDashboardResponse.RevenuePoint> chart =
+                buildRevenueChart(period, year, month, quarter, date, fromDay, toDay);
 
         // 3. Top 5 sản phẩm bán chạy trong khoảng thời gian
-        LocalDateTime from = resolveFrom(period, targetYear, fromDay);
-        LocalDateTime to   = resolveTo(period, targetYear, toDay);
-        List<AdminDashboardResponse.TopProductDto> topProducts = buildTopProducts(from, to);
+        List<AdminDashboardResponse.TopProductDto> topProducts = buildTopProducts(range.from(), range.to());
 
         // 4. Phân bổ trạng thái đơn
         List<AdminDashboardResponse.OrderStatusCount> statusDist = List.of(
@@ -53,15 +54,15 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
             AdminDashboardResponse.OrderStatusCount.builder().status("CANCELLED").count(cancelled).build(),
             AdminDashboardResponse.OrderStatusCount.builder()
                 .status("CONFIRMING")
-                .count(orderRepository.countByOrderStatus(OrderStatus.CONFIRMED))
+                .count(orderRepository.countByOrderStatusAndDateRange(OrderStatus.CONFIRMED, range.from(), range.to()))
                 .build(),
             AdminDashboardResponse.OrderStatusCount.builder()
                 .status("PREPARING")
-                .count(orderRepository.countByOrderStatus(OrderStatus.PREPARING))
+                .count(orderRepository.countByOrderStatusAndDateRange(OrderStatus.PREPARING, range.from(), range.to()))
                 .build(),
             AdminDashboardResponse.OrderStatusCount.builder()
                 .status("DELIVERING")
-                .count(orderRepository.countByOrderStatus(OrderStatus.DELIVERING))
+                .count(orderRepository.countByOrderStatusAndDateRange(OrderStatus.DELIVERING, range.from(), range.to()))
                 .build()
         );
 
@@ -83,17 +84,18 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
     // =====================================================================
 
     private List<AdminDashboardResponse.RevenuePoint> buildRevenueChart(
-            String period, int year, String fromDay, String toDay) {
+            String period, Integer year, Integer month, Integer quarter,
+            String date, String fromDay, String toDay) {
 
         List<AdminDashboardResponse.RevenuePoint> points = new ArrayList<>();
+        TimeRange range = resolveRange(period, year, month, quarter, date, fromDay, toDay);
+        String normalizedPeriod = normalizePeriod(period);
+        int targetYear = (year != null) ? year : LocalDate.now().getYear();
 
-        switch (period == null ? "month" : period.toLowerCase()) {
+        switch (normalizedPeriod) {
 
             case "day" -> {
-                // fromDay..toDay — VD: "2026-04-01" đến "2026-04-30"
-                LocalDateTime from = parseDate(fromDay, LocalDate.now().withDayOfMonth(1));
-                LocalDateTime to   = parseDate(toDay, LocalDate.now()).plusDays(1).minusNanos(1);
-                List<Object[]> rows = orderRepository.revenueByDay(from, to);
+                List<Object[]> rows = orderRepository.revenueByDay(range.from(), range.to());
                 for (Object[] r : rows) {
                     points.add(AdminDashboardResponse.RevenuePoint.builder()
                             .label(r[0].toString())
@@ -104,7 +106,9 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
             }
 
             case "quarter" -> {
-                List<Object[]> rows = orderRepository.revenueByQuarter(year);
+                List<Object[]> rows = (quarter != null)
+                        ? orderRepository.revenueByMonthInRange(range.from(), range.to())
+                        : orderRepository.revenueByQuarter(targetYear);
                 for (Object[] r : rows) {
                     points.add(AdminDashboardResponse.RevenuePoint.builder()
                             .label(r[0].toString())
@@ -115,7 +119,9 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
             }
 
             case "year" -> {
-                List<Object[]> rows = orderRepository.revenueByYear();
+                List<Object[]> rows = (range.from() != null && range.to() != null)
+                        ? orderRepository.revenueByMonth(targetYear)
+                        : orderRepository.revenueByYear();
                 for (Object[] r : rows) {
                     points.add(AdminDashboardResponse.RevenuePoint.builder()
                             .label(r[0].toString())
@@ -126,8 +132,9 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
             }
 
             default -> {
-                // "month" — mặc định
-                List<Object[]> rows = orderRepository.revenueByMonth(year);
+                List<Object[]> rows = (month != null)
+                        ? orderRepository.revenueByDay(range.from(), range.to())
+                        : orderRepository.revenueByMonth(targetYear);
                 for (Object[] r : rows) {
                     points.add(AdminDashboardResponse.RevenuePoint.builder()
                             .label(r[0].toString())
@@ -160,28 +167,69 @@ public class AdminDashboardServiceImpl implements IAdminDashboardService {
         return LocalDate.parse(dateStr).atStartOfDay();
     }
 
-    private LocalDateTime resolveFrom(String period, int year, String fromDay) {
-        if (period == null) return LocalDate.of(year, 1, 1).atStartOfDay();
-        return switch (period.toLowerCase()) {
-            case "day"     -> parseDate(fromDay, LocalDate.now().withDayOfMonth(1));
-            case "quarter", "month" -> LocalDate.of(year, 1, 1).atStartOfDay();
-            case "year"    -> null;
-            default        -> LocalDate.of(year, 1, 1).atStartOfDay();
+    private TimeRange resolveRange(String period, Integer year, Integer month, Integer quarter,
+                                   String date, String fromDay, String toDay) {
+        String normalizedPeriod = normalizePeriod(period);
+        int targetYear = (year != null) ? year : LocalDate.now().getYear();
+        return switch (normalizedPeriod) {
+            case "day" -> {
+                if (date != null && !date.isBlank()) {
+                    LocalDate d = LocalDate.parse(date);
+                    yield new TimeRange(d.atStartOfDay(), d.atTime(LocalTime.MAX));
+                }
+                LocalDateTime from = parseDate(fromDay, LocalDate.now().withDayOfMonth(1));
+                LocalDateTime to = parseDate(toDay, LocalDate.now()).plusDays(1).minusNanos(1);
+                yield new TimeRange(from, to);
+            }
+            case "month" -> {
+                if (month != null) {
+                    validateMonth(month);
+                    LocalDate start = LocalDate.of(targetYear, month, 1);
+                    yield new TimeRange(start.atStartOfDay(), start.withDayOfMonth(start.lengthOfMonth()).atTime(LocalTime.MAX));
+                }
+                yield new TimeRange(LocalDate.of(targetYear, 1, 1).atStartOfDay(), LocalDate.of(targetYear, 12, 31).atTime(LocalTime.MAX));
+            }
+            case "quarter" -> {
+                if (quarter != null) {
+                    validateQuarter(quarter);
+                    int startMonth = (quarter - 1) * 3 + 1;
+                    LocalDate start = LocalDate.of(targetYear, startMonth, 1);
+                    LocalDate end = start.plusMonths(2).withDayOfMonth(start.plusMonths(2).lengthOfMonth());
+                    yield new TimeRange(start.atStartOfDay(), end.atTime(LocalTime.MAX));
+                }
+                yield new TimeRange(LocalDate.of(targetYear, 1, 1).atStartOfDay(), LocalDate.of(targetYear, 12, 31).atTime(LocalTime.MAX));
+            }
+            case "year" -> {
+                if (year != null) {
+                    yield new TimeRange(LocalDate.of(targetYear, 1, 1).atStartOfDay(), LocalDate.of(targetYear, 12, 31).atTime(LocalTime.MAX));
+                }
+                yield new TimeRange(null, null);
+            }
+            default -> new TimeRange(null, null);
         };
     }
 
-    private LocalDateTime resolveTo(String period, int year, String toDay) {
-        if (period == null) return LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
-        return switch (period.toLowerCase()) {
-            case "day"     -> parseDate(toDay, LocalDate.now()).plusDays(1).minusNanos(1);
-            case "quarter", "month" -> LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
-            case "year"    -> null;
-            default        -> LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
-        };
+    private String normalizePeriod(String period) {
+        return (period == null || period.isBlank()) ? "month" : period.toLowerCase();
+    }
+
+    private void validateMonth(int month) {
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("month phải nằm trong khoảng 1..12");
+        }
+    }
+
+    private void validateQuarter(int quarter) {
+        if (quarter < 1 || quarter > 4) {
+            throw new IllegalArgumentException("quarter phải nằm trong khoảng 1..4");
+        }
     }
 
     private Long toLong(Object val) {
         if (val == null) return 0L;
         return ((Number) val).longValue();
+    }
+
+    private record TimeRange(LocalDateTime from, LocalDateTime to) {
     }
 }
