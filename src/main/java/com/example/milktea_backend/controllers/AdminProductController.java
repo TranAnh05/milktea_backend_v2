@@ -4,6 +4,7 @@ import com.example.milktea_backend.dtos.requests.AdminProductRequest;
 import com.example.milktea_backend.dtos.responses.AdminProductResponse;
 import com.example.milktea_backend.dtos.responses.ApiResponse;
 import com.example.milktea_backend.services.interfaces.IAdminProductService;
+import com.example.milktea_backend.services.interfaces.IMediaStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class AdminProductController {
 
     private final IAdminProductService adminProductService;
+        private final IMediaStorageService mediaStorageService;
 
     // ---------------------------------------------------------------
     // GET ALL
@@ -134,4 +136,27 @@ public class AdminProductController {
         return ResponseEntity.ok(ApiResponse.<IAdminProductService.ImportResult>builder()
                 .message(msg).data(result).build());
     }
+
+        // ---------------------------------------------------------------
+        // UPLOAD IMAGE
+        // ---------------------------------------------------------------
+        @PostMapping("/upload-image")
+        @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_MANAGER')")
+        public ResponseEntity<ApiResponse<String>> uploadProductImage(
+                        @RequestParam("file") MultipartFile file) {
+
+                String storedUrl = mediaStorageService.persistUploadedImage(file, "product");
+                if (storedUrl == null || storedUrl.isBlank()) {
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.<String>builder()
+                                                        .status(400)
+                                                        .message("File ảnh không hợp lệ hoặc upload thất bại")
+                                                        .build());
+                }
+
+                return ResponseEntity.ok(ApiResponse.<String>builder()
+                                .message("Upload ảnh thành công")
+                                .data(storedUrl)
+                                .build());
+        }
 }
