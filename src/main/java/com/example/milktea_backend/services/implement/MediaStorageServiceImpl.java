@@ -3,6 +3,7 @@ package com.example.milktea_backend.services.implement;
 import com.example.milktea_backend.services.interfaces.IMediaStorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -62,6 +63,38 @@ public class MediaStorageServiceImpl implements IMediaStorageService {
         }
     }
 
+    @Override
+    public String persistUploadedImage(MultipartFile file, String prefix) {
+        if (file == null || file.isEmpty()) return null;
+
+        try {
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+                return null;
+            }
+
+            String ext = extensionFromContentType(contentType);
+            if (ext == null) ext = extensionFromFileName(file.getOriginalFilename());
+            if (ext == null) ext = "jpg";
+
+            Path dir = Path.of(uploadDir).toAbsolutePath().normalize();
+            Files.createDirectories(dir);
+
+            String safePrefix = (prefix == null || prefix.isBlank()) ? "image" : prefix.replaceAll("[^a-zA-Z0-9_-]", "").toLowerCase(Locale.ROOT);
+            String fileName = safePrefix + "-" + UUID.randomUUID() + "." + ext;
+            Path targetFile = dir.resolve(fileName);
+
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            String normalizedPublicPath = publicPath.startsWith("/") ? publicPath : "/" + publicPath;
+            return normalizedPublicPath + "/" + fileName;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     private boolean isRemoteHttpUrl(String value) {
         String lower = value.toLowerCase(Locale.ROOT);
         return lower.startsWith("http://") || lower.startsWith("https://");
@@ -84,5 +117,9 @@ public class MediaStorageServiceImpl implements IMediaStorageService {
         String ext = path.substring(dot + 1).toLowerCase(Locale.ROOT);
         if (ext.matches("[a-z0-9]{2,5}")) return ext;
         return null;
+    }
+
+    private String extensionFromFileName(String fileName) {
+        return extensionFromUrlPath(fileName);
     }
 }
