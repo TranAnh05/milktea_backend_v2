@@ -9,6 +9,7 @@ import java.util.List;
 public class CartItemResponse {
     private String signature;
     private Long productId;
+    private String slug;
     private String productName;
     private String thumbnailUrl;
     private Long sizeId;

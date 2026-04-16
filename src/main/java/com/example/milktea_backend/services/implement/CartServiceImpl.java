@@ -168,6 +168,7 @@ public class CartServiceImpl implements ICartService {
             return CartItemResponse.builder()
                     .signature(item.getItemSignature())
                     .productId(item.getProduct().getId())
+                    .slug(item.getProduct().getSlug())
                     .productName(item.getProduct().getName())
                     .thumbnailUrl(item.getProduct().getThumbnailUrl())
                     .sizeId(item.getSize().getId())
