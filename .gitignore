@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Gemini CLI ###
+.gemini/
+.geminiignore
+gemini.config.json
+*.gemini.json
+GEMINI.md

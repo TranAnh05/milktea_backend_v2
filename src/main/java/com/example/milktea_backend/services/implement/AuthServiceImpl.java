@@ -38,7 +38,8 @@ public class AuthServiceImpl implements IAuthService {
     private final RoleRepository roleRepository;
     private final VerificationTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final IEmailService emailService;
+
+    private final ResendEmailService emailService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
